@@ -30,6 +30,7 @@ interface Grade {
   date: string;
   comment: string;
   subjectName: string;
+  studentName?: string;
 }
 
 interface ScheduleItem {
@@ -162,6 +163,37 @@ export default function Index() {
       }
     } catch (error) {
       console.error('Failed to load student data:', error);
+    }
+  };
+
+  const loadAllGrades = async () => {
+    try {
+      const allGradesData: Grade[] = [];
+      for (const student of students) {
+        const response = await fetch(`${API.grades}?studentId=${student.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          allGradesData.push(...data.grades.map((g: Grade) => ({
+            ...g,
+            studentName: `${student.firstName} ${student.lastName}`
+          })));
+        }
+      }
+      setGrades(allGradesData);
+    } catch (error) {
+      console.error('Failed to load all grades:', error);
+    }
+  };
+
+  const loadClassSchedule = async (classId: number) => {
+    try {
+      const response = await fetch(`${API.schedule}?classId=${classId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSchedule(data);
+      }
+    } catch (error) {
+      console.error('Failed to load schedule:', error);
     }
   };
 
@@ -610,7 +642,44 @@ export default function Index() {
                   </Dialog>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">Используйте кнопку выше для выставления оценок ученикам</p>
+                  <div className="mb-4">
+                    <Button onClick={loadAllGrades} variant="outline">
+                      <Icon name="RefreshCw" size={18} className="mr-2" />
+                      Загрузить все оценки
+                    </Button>
+                  </div>
+                  {grades.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">Нет оценок. Нажмите "Загрузить все оценки"</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Ученик</TableHead>
+                          <TableHead>Предмет</TableHead>
+                          <TableHead>Оценка</TableHead>
+                          <TableHead>Дата</TableHead>
+                          <TableHead>Комментарий</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {grades.map((grade) => (
+                          <TableRow key={grade.id}>
+                            <TableCell>{grade.studentName || '—'}</TableCell>
+                            <TableCell>{grade.subjectName}</TableCell>
+                            <TableCell>
+                              <span className={`font-bold ${
+                                grade.grade >= 4 ? 'text-green-600' : grade.grade === 3 ? 'text-yellow-600' : 'text-red-600'
+                              }`}>
+                                {grade.grade}
+                              </span>
+                            </TableCell>
+                            <TableCell>{new Date(grade.date).toLocaleDateString('ru-RU')}</TableCell>
+                            <TableCell className="text-muted-foreground">{grade.comment || '—'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -702,7 +771,57 @@ export default function Index() {
                   </Dialog>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">Используйте кнопку выше для добавления уроков в расписание классов</p>
+                  <div className="mb-4 space-y-2">
+                    <Label>Выберите класс для просмотра расписания</Label>
+                    <select
+                      className="w-full p-2 border rounded-md"
+                      onChange={(e) => {
+                        const classId = Number(e.target.value);
+                        if (classId) loadClassSchedule(classId);
+                      }}
+                    >
+                      <option value="">Выберите класс</option>
+                      {classes.map((cls) => (
+                        <option key={cls.id} value={cls.id}>
+                          {cls.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {schedule.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">Выберите класс для просмотра расписания</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {DAYS.map((day, dayIndex) => {
+                        const daySchedule = schedule.filter(s => s.dayOfWeek === dayIndex + 1);
+                        if (daySchedule.length === 0) return null;
+                        return (
+                          <Card key={dayIndex}>
+                            <CardHeader>
+                              <CardTitle className="text-lg">{day}</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-2">
+                                {daySchedule.map((item) => (
+                                  <div key={item.id} className="flex justify-between items-center p-3 border rounded-md bg-secondary/10">
+                                    <div>
+                                      <div className="font-medium">{item.subjectName}</div>
+                                      <div className="text-sm text-muted-foreground">
+                                        Кабинет: {item.room || '—'}
+                                      </div>
+                                    </div>
+                                    <div className="text-sm font-medium">
+                                      {item.timeStart} - {item.timeEnd}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
