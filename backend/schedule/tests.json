@@ -1,0 +1,31 @@
+{
+  "tests": [
+    {
+      "name": "Get class schedule",
+      "method": "GET",
+      "path": "/?classId=1",
+      "expectedStatus": 200,
+      "expectedBody": [],
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Add schedule entry",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "classId": 1,
+        "subjectId": 1,
+        "dayOfWeek": 1,
+        "timeStart": "09:00",
+        "timeEnd": "09:45",
+        "room": "201"
+      },
+      "expectedStatus": 201,
+      "expectedBody": {
+        "id": "number",
+        "message": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

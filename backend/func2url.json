@@ -1,0 +1,6 @@
+{
+  "auth": "https://functions.poehali.dev/21a8c9bd-9696-422c-b407-c5b6de9276ba",
+  "schedule": "https://functions.poehali.dev/e76355a4-a426-4e99-8617-c3396596eedf",
+  "grades": "https://functions.poehali.dev/89ea596d-9701-428a-84d6-09b2fcb5c858",
+  "students": "https://functions.poehali.dev/58887c14-07c7-474d-9010-85413635fec6"
+}

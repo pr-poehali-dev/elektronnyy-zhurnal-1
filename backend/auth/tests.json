@@ -1,0 +1,34 @@
+{
+  "tests": [
+    {
+      "name": "Successful login",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "email": "romaargunov@mail.ru",
+        "password": "1qaz2wsx"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "id": "number",
+        "email": "string",
+        "role": "teacher"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Failed login - wrong password",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "email": "romaargunov@mail.ru",
+        "password": "wrongpassword"
+      },
+      "expectedStatus": 401,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
