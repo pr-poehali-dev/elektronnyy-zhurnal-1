@@ -34,48 +34,64 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         params = event.get('queryStringParameters', {})
         student_id = params.get('studentId')
         
-        if not student_id:
-            cur.close()
-            conn.close()
-            return {
-                'statusCode': 400,
-                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                'isBase64Encoded': False,
-                'body': json.dumps({'error': 'studentId required'})
+        if student_id:
+            cur.execute(f"""
+                SELECT g.id, g.grade, g.date, g.comment, s.name as subject_name
+                FROM grades g
+                JOIN subjects s ON g.subject_id = s.id
+                WHERE g.student_id = {student_id}
+                ORDER BY g.date DESC
+            """)
+            
+            grades = cur.fetchall()
+            
+            cur.execute(f"""
+                SELECT AVG(grade)::DECIMAL(10,2) 
+                FROM grades 
+                WHERE student_id = {student_id}
+            """)
+            
+            avg_result = cur.fetchone()
+            avg_grade = float(avg_result[0]) if avg_result[0] else 0
+            
+            result = {
+                'averageGrade': avg_grade,
+                'grades': [
+                    {
+                        'id': g[0],
+                        'grade': g[1],
+                        'date': g[2].isoformat() if g[2] else None,
+                        'comment': g[3],
+                        'subjectName': g[4]
+                    }
+                    for g in grades
+                ]
             }
-        
-        cur.execute("""
-            SELECT g.id, g.grade, g.date, g.comment, s.name as subject_name
-            FROM grades g
-            JOIN subjects s ON g.subject_id = s.id
-            WHERE g.student_id = %s
-            ORDER BY g.date DESC
-        """, (student_id,))
-        
-        grades = cur.fetchall()
-        
-        cur.execute("""
-            SELECT AVG(grade)::DECIMAL(10,2) 
-            FROM grades 
-            WHERE student_id = %s
-        """, (student_id,))
-        
-        avg_result = cur.fetchone()
-        avg_grade = float(avg_result[0]) if avg_result[0] else 0
-        
-        result = {
-            'averageGrade': avg_grade,
-            'grades': [
-                {
-                    'id': g[0],
-                    'grade': g[1],
-                    'date': g[2].isoformat() if g[2] else None,
-                    'comment': g[3],
-                    'subjectName': g[4]
-                }
-                for g in grades
-            ]
-        }
+        else:
+            cur.execute("""
+                SELECT g.id, g.grade, g.date, g.comment, s.name as subject_name, 
+                       st.first_name || ' ' || st.last_name as student_name
+                FROM grades g
+                JOIN subjects s ON g.subject_id = s.id
+                JOIN students st ON g.student_id = st.id
+                ORDER BY g.date DESC
+            """)
+            
+            grades = cur.fetchall()
+            
+            result = {
+                'grades': [
+                    {
+                        'id': g[0],
+                        'grade': g[1],
+                        'date': g[2].isoformat() if g[2] else None,
+                        'comment': g[3],
+                        'subjectName': g[4],
+                        'studentName': g[5]
+                    }
+                    for g in grades
+                ]
+            }
         
         cur.close()
         conn.close()
@@ -93,13 +109,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         subject_id = body_data.get('subjectId')
         grade = body_data.get('grade')
         grade_date = body_data.get('date', str(date.today()))
-        comment = body_data.get('comment', '')
+        comment = body_data.get('comment', '').replace("'", "''")
         
-        cur.execute("""
+        cur.execute(f"""
             INSERT INTO grades (student_id, subject_id, grade, date, comment)
-            VALUES (%s, %s, %s, %s, %s)
+            VALUES ({student_id}, {subject_id}, {grade}, '{grade_date}', '{comment}')
             RETURNING id
-        """, (student_id, subject_id, grade, grade_date, comment))
+        """)
         
         grade_id = cur.fetchone()[0]
         conn.commit()

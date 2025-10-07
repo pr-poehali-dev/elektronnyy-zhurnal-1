@@ -43,14 +43,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'body': json.dumps({'error': 'classId required'})
             }
         
-        cur.execute("""
+        cur.execute(f"""
             SELECT sc.id, sc.day_of_week, sc.time_start, sc.time_end, 
                    sc.room, s.name as subject_name
             FROM schedule sc
             JOIN subjects s ON sc.subject_id = s.id
-            WHERE sc.class_id = %s
+            WHERE sc.class_id = {class_id}
             ORDER BY sc.day_of_week, sc.time_start
-        """, (class_id,))
+        """)
         
         schedule_items = cur.fetchall()
         
@@ -83,13 +83,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         day_of_week = body_data.get('dayOfWeek')
         time_start = body_data.get('timeStart')
         time_end = body_data.get('timeEnd')
-        room = body_data.get('room', '')
+        room = body_data.get('room', '').replace("'", "''")
         
-        cur.execute("""
+        cur.execute(f"""
             INSERT INTO schedule (class_id, subject_id, day_of_week, time_start, time_end, room)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            VALUES ({class_id}, {subject_id}, {day_of_week}, '{time_start}', '{time_end}', '{room}')
             RETURNING id
-        """, (class_id, subject_id, day_of_week, time_start, time_end, room))
+        """)
         
         schedule_id = cur.fetchone()[0]
         conn.commit()

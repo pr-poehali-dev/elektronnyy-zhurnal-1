@@ -84,6 +84,8 @@ export default function Index() {
   const [isAddGradeOpen, setIsAddGradeOpen] = useState(false);
   const [newSchedule, setNewSchedule] = useState({ dayOfWeek: 1, timeStart: '09:00', timeEnd: '09:45', room: '', subject: '' });
   const [isAddScheduleOpen, setIsAddScheduleOpen] = useState(false);
+  const [isAddStudentToClassOpen, setIsAddStudentToClassOpen] = useState(false);
+  const [selectedClassForStudent, setSelectedClassForStudent] = useState<number | null>(null);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -279,6 +281,30 @@ export default function Index() {
     }
   };
 
+  const handleAddStudentToClass = async () => {
+    if (!selectedClassForStudent || !selectedStudent) return;
+    try {
+      const response = await fetch(API.students, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          classId: selectedClassForStudent,
+          studentId: selectedStudent,
+        }),
+      });
+      
+      if (response.ok) {
+        toast({ title: 'Успешно', description: 'Ученик добавлен в класс' });
+        setIsAddStudentToClassOpen(false);
+        setSelectedStudent(null);
+        setSelectedClassForStudent(null);
+        loadClasses();
+      }
+    } catch (error) {
+      toast({ title: 'Ошибка', description: 'Не удалось добавить ученика в класс', variant: 'destructive' });
+    }
+  };
+
   const handleAddGrade = async () => {
     if (!selectedStudent) return;
     try {
@@ -468,9 +494,21 @@ export default function Index() {
                             </CardTitle>
                           </CardHeader>
                           <CardContent>
-                            <div className="text-sm text-muted-foreground">
+                            <div className="text-sm text-muted-foreground mb-3">
                               <p>Учеников: {cls.studentCount}</p>
                             </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="w-full"
+                              onClick={() => {
+                                setSelectedClassForStudent(cls.id);
+                                setIsAddStudentToClassOpen(true);
+                              }}
+                            >
+                              <Icon name="UserPlus" size={16} className="mr-2" />
+                              Добавить ученика
+                            </Button>
                           </CardContent>
                         </Card>
                       ))
@@ -478,6 +516,34 @@ export default function Index() {
                   </div>
                 </CardContent>
               </Card>
+
+              <Dialog open={isAddStudentToClassOpen} onOpenChange={setIsAddStudentToClassOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Добавить ученика в класс</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <div className="space-y-2">
+                      <Label>Выберите ученика</Label>
+                      <select
+                        className="w-full p-2 border rounded-md"
+                        value={selectedStudent || ''}
+                        onChange={(e) => setSelectedStudent(Number(e.target.value))}
+                      >
+                        <option value="">Выберите ученика</option>
+                        {students.map((student) => (
+                          <option key={student.id} value={student.id}>
+                            {student.firstName} {student.lastName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <Button onClick={handleAddStudentToClass} className="w-full" disabled={!selectedStudent}>
+                      Добавить
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </TabsContent>
 
             <TabsContent value="students" className="space-y-4">
