@@ -41,12 +41,22 @@ interface ScheduleItem {
   subjectName: string;
 }
 
+interface Class {
+  id: number;
+  name: string;
+  teacherId: number;
+  teacherFirstName: string;
+  teacherLastName: string;
+  studentCount: number;
+}
+
 const API_BASE = 'https://functions.poehali.dev';
 const API = {
   auth: `${API_BASE}/21a8c9bd-9696-422c-b407-c5b6de9276ba`,
   students: `${API_BASE}/58887c14-07c7-474d-9010-85413635fec6`,
   grades: `${API_BASE}/89ea596d-9701-428a-84d6-09b2fcb5c858`,
   schedule: `${API_BASE}/e76355a4-a426-4e99-8617-c3396596eedf`,
+  classes: `${API_BASE}/19601f1c-fd62-4bd0-b8c4-3509f8967a57`,
 };
 
 const DAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
@@ -61,9 +71,18 @@ export default function Index() {
   const [grades, setGrades] = useState<Grade[]>([]);
   const [averageGrade, setAverageGrade] = useState<number>(0);
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
   
-  const [newStudent, setNewStudent] = useState({ firstName: '', lastName: '', email: '', password: 'student123' });
+  const [newStudent, setNewStudent] = useState({ firstName: '', lastName: '', email: '', password: 'student123', classId: '' });
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
+  const [newClass, setNewClass] = useState({ name: '' });
+  const [isAddClassOpen, setIsAddClassOpen] = useState(false);
+  const [selectedClass, setSelectedClass] = useState<number | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
+  const [newGrade, setNewGrade] = useState({ grade: 5, comment: '', subject: '' });
+  const [isAddGradeOpen, setIsAddGradeOpen] = useState(false);
+  const [newSchedule, setNewSchedule] = useState({ dayOfWeek: 1, timeStart: '09:00', timeEnd: '09:45', room: '', subject: '' });
+  const [isAddScheduleOpen, setIsAddScheduleOpen] = useState(false);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -72,6 +91,7 @@ export default function Index() {
       setUser(parsedUser);
       if (parsedUser.role === 'teacher') {
         loadStudents();
+        loadClasses();
       } else {
         loadStudentData(parsedUser.id);
       }
@@ -95,6 +115,7 @@ export default function Index() {
         
         if (userData.role === 'teacher') {
           loadStudents();
+          loadClasses();
         } else {
           loadStudentData(userData.id);
         }
@@ -144,6 +165,54 @@ export default function Index() {
     }
   };
 
+  const loadClasses = async () => {
+    if (!user) return;
+    try {
+      const response = await fetch(`${API.classes}?teacherId=${user.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setClasses(data);
+      }
+    } catch (error) {
+      console.error('Failed to load classes:', error);
+    }
+  };
+
+  const handleAddClass = async () => {
+    if (!user) return;
+    try {
+      const response = await fetch(API.classes, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newClass.name, teacherId: user.id }),
+      });
+      
+      if (response.ok) {
+        toast({ title: 'Класс создан', description: 'Новый класс успешно добавлен' });
+        setIsAddClassOpen(false);
+        setNewClass({ name: '' });
+        loadClasses();
+      }
+    } catch (error) {
+      toast({ title: 'Ошибка', description: 'Не удалось создать класс', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteClass = async (classId: number) => {
+    try {
+      const response = await fetch(`${API.classes}?id=${classId}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        toast({ title: 'Класс удален', description: 'Класс успешно удален' });
+        loadClasses();
+      }
+    } catch (error) {
+      toast({ title: 'Ошибка', description: 'Не удалось удалить класс', variant: 'destructive' });
+    }
+  };
+
   const handleAddStudent = async () => {
     try {
       const response = await fetch(API.students, {
@@ -155,11 +224,78 @@ export default function Index() {
       if (response.ok) {
         toast({ title: 'Ученик добавлен', description: 'Новый ученик успешно создан' });
         setIsAddStudentOpen(false);
-        setNewStudent({ firstName: '', lastName: '', email: '', password: 'student123' });
+        setNewStudent({ firstName: '', lastName: '', email: '', password: 'student123', classId: '' });
         loadStudents();
       }
     } catch (error) {
       toast({ title: 'Ошибка', description: 'Не удалось добавить ученика', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteStudent = async (studentId: number) => {
+    try {
+      const response = await fetch(`${API.students}?id=${studentId}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        toast({ title: 'Ученик удален', description: 'Ученик успешно удален' });
+        loadStudents();
+      }
+    } catch (error) {
+      toast({ title: 'Ошибка', description: 'Не удалось удалить ученика', variant: 'destructive' });
+    }
+  };
+
+  const handleAddGrade = async () => {
+    if (!selectedStudent) return;
+    try {
+      const response = await fetch(API.grades, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: selectedStudent,
+          subjectId: 1,
+          grade: newGrade.grade,
+          comment: newGrade.comment,
+          date: new Date().toISOString().split('T')[0]
+        }),
+      });
+      
+      if (response.ok) {
+        toast({ title: 'Оценка добавлена', description: 'Оценка успешно выставлена' });
+        setIsAddGradeOpen(false);
+        setNewGrade({ grade: 5, comment: '', subject: '' });
+        setSelectedStudent(null);
+      }
+    } catch (error) {
+      toast({ title: 'Ошибка', description: 'Не удалось добавить оценку', variant: 'destructive' });
+    }
+  };
+
+  const handleAddSchedule = async () => {
+    if (!selectedClass) return;
+    try {
+      const response = await fetch(API.schedule, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          classId: selectedClass,
+          subjectId: 1,
+          dayOfWeek: newSchedule.dayOfWeek,
+          timeStart: newSchedule.timeStart,
+          timeEnd: newSchedule.timeEnd,
+          room: newSchedule.room
+        }),
+      });
+      
+      if (response.ok) {
+        toast({ title: 'Расписание добавлено', description: 'Урок успешно добавлен в расписание' });
+        setIsAddScheduleOpen(false);
+        setNewSchedule({ dayOfWeek: 1, timeStart: '09:00', timeEnd: '09:45', room: '', subject: '' });
+      }
+    } catch (error) {
+      toast({ title: 'Ошибка', description: 'Не удалось добавить расписание', variant: 'destructive' });
     }
   };
 
@@ -227,8 +363,12 @@ export default function Index() {
         </header>
 
         <main className="container mx-auto px-4 py-8">
-          <Tabs defaultValue="students" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3 max-w-lg">
+          <Tabs defaultValue="classes" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+              <TabsTrigger value="classes">
+                <Icon name="School" size={18} className="mr-2" />
+                Классы
+              </TabsTrigger>
               <TabsTrigger value="students">
                 <Icon name="Users" size={18} className="mr-2" />
                 Ученики
@@ -242,6 +382,71 @@ export default function Index() {
                 Расписание
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="classes" className="space-y-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                  <CardTitle>Классы</CardTitle>
+                  <Dialog open={isAddClassOpen} onOpenChange={setIsAddClassOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Icon name="Plus" size={18} className="mr-2" />
+                        Создать класс
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Новый класс</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 pt-4">
+                        <div className="space-y-2">
+                          <Label>Название класса</Label>
+                          <Input
+                            placeholder="Например: 10А"
+                            value={newClass.name}
+                            onChange={(e) => setNewClass({ name: e.target.value })}
+                          />
+                        </div>
+                        <Button onClick={handleAddClass} className="w-full">
+                          Создать
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {classes.length === 0 ? (
+                      <p className="text-muted-foreground col-span-full text-center py-8">
+                        Нет классов
+                      </p>
+                    ) : (
+                      classes.map((cls) => (
+                        <Card key={cls.id} className="hover:shadow-md transition-shadow">
+                          <CardHeader>
+                            <CardTitle className="flex items-center justify-between">
+                              <span>{cls.name}</span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteClass(cls.id)}
+                              >
+                                <Icon name="Trash2" size={18} className="text-destructive" />
+                              </Button>
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-sm text-muted-foreground">
+                              <p>Учеников: {cls.studentCount}</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
             <TabsContent value="students" className="space-y-4">
               <Card>
@@ -303,12 +508,13 @@ export default function Index() {
                         <TableHead>Имя</TableHead>
                         <TableHead>Фамилия</TableHead>
                         <TableHead>Email</TableHead>
+                        <TableHead className="text-right">Действия</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {students.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={4} className="text-center text-muted-foreground">
+                          <TableCell colSpan={5} className="text-center text-muted-foreground">
                             Нет учеников
                           </TableCell>
                         </TableRow>
@@ -319,6 +525,15 @@ export default function Index() {
                             <TableCell>{student.firstName}</TableCell>
                             <TableCell>{student.lastName}</TableCell>
                             <TableCell>{student.email}</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteStudent(student.id)}
+                              >
+                                <Icon name="Trash2" size={16} className="text-destructive" />
+                              </Button>
+                            </TableCell>
                           </TableRow>
                         ))
                       )}
@@ -330,22 +545,164 @@ export default function Index() {
 
             <TabsContent value="grades" className="space-y-4">
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                   <CardTitle>Журнал оценок</CardTitle>
+                  <Dialog open={isAddGradeOpen} onOpenChange={setIsAddGradeOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Icon name="Plus" size={18} className="mr-2" />
+                        Выставить оценку
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Выставить оценку</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 pt-4">
+                        <div className="space-y-2">
+                          <Label>Ученик</Label>
+                          <select
+                            className="w-full p-2 border rounded-md"
+                            value={selectedStudent || ''}
+                            onChange={(e) => setSelectedStudent(Number(e.target.value))}
+                          >
+                            <option value="">Выберите ученика</option>
+                            {students.map((student) => (
+                              <option key={student.id} value={student.id}>
+                                {student.firstName} {student.lastName}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Предмет</Label>
+                          <Input
+                            placeholder="Математика"
+                            value={newGrade.subject}
+                            onChange={(e) => setNewGrade({ ...newGrade, subject: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Оценка</Label>
+                          <select
+                            className="w-full p-2 border rounded-md"
+                            value={newGrade.grade}
+                            onChange={(e) => setNewGrade({ ...newGrade, grade: Number(e.target.value) })}
+                          >
+                            <option value={5}>5 (Отлично)</option>
+                            <option value={4}>4 (Хорошо)</option>
+                            <option value={3}>3 (Удовлетворительно)</option>
+                            <option value={2}>2 (Неудовлетворительно)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Комментарий (необязательно)</Label>
+                          <Input
+                            value={newGrade.comment}
+                            onChange={(e) => setNewGrade({ ...newGrade, comment: e.target.value })}
+                          />
+                        </div>
+                        <Button onClick={handleAddGrade} className="w-full" disabled={!selectedStudent}>
+                          Выставить
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">Выберите ученика для просмотра и добавления оценок</p>
+                  <p className="text-muted-foreground">Используйте кнопку выше для выставления оценок ученикам</p>
                 </CardContent>
               </Card>
             </TabsContent>
 
             <TabsContent value="schedule" className="space-y-4">
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                   <CardTitle>Расписание занятий</CardTitle>
+                  <Dialog open={isAddScheduleOpen} onOpenChange={setIsAddScheduleOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Icon name="Plus" size={18} className="mr-2" />
+                        Добавить урок
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Добавить урок в расписание</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 pt-4">
+                        <div className="space-y-2">
+                          <Label>Класс</Label>
+                          <select
+                            className="w-full p-2 border rounded-md"
+                            value={selectedClass || ''}
+                            onChange={(e) => setSelectedClass(Number(e.target.value))}
+                          >
+                            <option value="">Выберите класс</option>
+                            {classes.map((cls) => (
+                              <option key={cls.id} value={cls.id}>
+                                {cls.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Предмет</Label>
+                          <Input
+                            placeholder="Математика"
+                            value={newSchedule.subject}
+                            onChange={(e) => setNewSchedule({ ...newSchedule, subject: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>День недели</Label>
+                          <select
+                            className="w-full p-2 border rounded-md"
+                            value={newSchedule.dayOfWeek}
+                            onChange={(e) => setNewSchedule({ ...newSchedule, dayOfWeek: Number(e.target.value) })}
+                          >
+                            {DAYS.map((day, index) => (
+                              <option key={index} value={index + 1}>
+                                {day}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Начало</Label>
+                            <Input
+                              type="time"
+                              value={newSchedule.timeStart}
+                              onChange={(e) => setNewSchedule({ ...newSchedule, timeStart: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Конец</Label>
+                            <Input
+                              type="time"
+                              value={newSchedule.timeEnd}
+                              onChange={(e) => setNewSchedule({ ...newSchedule, timeEnd: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Кабинет</Label>
+                          <Input
+                            placeholder="201"
+                            value={newSchedule.room}
+                            onChange={(e) => setNewSchedule({ ...newSchedule, room: e.target.value })}
+                          />
+                        </div>
+                        <Button onClick={handleAddSchedule} className="w-full" disabled={!selectedClass}>
+                          Добавить
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">Управление расписанием для классов</p>
+                  <p className="text-muted-foreground">Используйте кнопку выше для добавления уроков в расписание классов</p>
                 </CardContent>
               </Card>
             </TabsContent>
